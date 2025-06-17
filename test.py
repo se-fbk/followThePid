@@ -22,7 +22,7 @@ def monitor_process(pid):
     try:
         while True:
             meter.start()
-            time.sleep(1)
+            time.sleep(0.1)
             meter.stop()
 
             energy_data = meter.get_trace()
@@ -36,14 +36,15 @@ def monitor_process(pid):
             totale_rapl += energia_rapl_int
 
             num_cores = psutil.cpu_count(logical=True) or 1
-            cpu_percent = (process.cpu_percent(interval=None) / 100) / num_cores
+            cpu_percent = process.cpu_percent(interval=None)
 
-            energia_stima = energia_rapl_int * (cpu_percent / 100)
+            energia_stima = energia_rapl_int * (( cpu_percent / 100) / num_cores )
             totale_stima += energia_stima
 
             print(
                 f"PID {pid} | "
-                f"CPU: {cpu_percent:.1f}% | "
+                # f"CPU: {cpu_percent:.1f}% | "
+                f"CPU: {cpu_percent} | "
                 #f"CPU/n.cores: {cpu_percent / num_cores} | "
                 f"Energy: {energia_stima / 1_000_000:.2f} J (curr), "
                 f"{totale_stima / 1_000_000:.2f} J (proc total), "
