@@ -21,6 +21,9 @@ def monitor_process(pid):
 
     try:
         while True:
+            if not process.is_running() or process.status() == psutil.STATUS_ZOMBIE:
+                print(f"\nIl processo PID {pid} è terminato.")
+                break
             meter.start()
             time.sleep(0.1)
             meter.stop()
@@ -49,29 +52,29 @@ def monitor_process(pid):
                 f"Energy: {energia_stima / 1_000_000:.2f} J (curr), "
                 f"{totale_stima / 1_000_000:.2f} J (proc total), "
                 f"{totale_rapl / 1_000_000:.2f} J (RAPL total)"
+        
             )
 
     except KeyboardInterrupt:
         print("\nMonitoraggio terminato.")
-        print(
-            f"\nEnergia totale stimata per PID {pid}: "
-            f"{totale_stima:.2f} µJ ({totale_stima / 1_000_000:.6f} J)"
-        )
-        print(
-            f"Energia totale letta da RAPL: "
-            f"{totale_rapl:.2f} µJ ({totale_rapl / 1_000_000:.6f} J)"
-        )
+    
+    
+    print(
+        f"\nEnergia totale stimata per PID {pid}: "
+        f"{totale_stima:.2f} µJ ({totale_stima / 1_000_000:.6f} J)"
+    )
+    print(
+        f"Energia totale letta da RAPL: "
+        f"{totale_rapl:.2f} µJ ({totale_rapl / 1_000_000:.6f} J)"
+    )
 
 if __name__ == "__main__":
     # pid = int(input("Inserisci il PID da monitorare: "))
     # monitor_process(pid)
 
-    script_path = "./underTest.py"
-
     try:
         # Avvia il programma come sottoprocesso
-        proc = subprocess.Popen([sys.executable, script_path])
-        monitor_process(proc.pid)
+        monitor_process(pid=int(sys.argv[1]))
     except FileNotFoundError:
         print("Script non trovato.")
     except Exception as e:
