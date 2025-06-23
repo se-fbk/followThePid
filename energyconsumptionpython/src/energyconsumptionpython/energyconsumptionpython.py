@@ -1,5 +1,6 @@
 import psutil
 import time
+import subprocess
 from datetime import datetime
 from typing import List, Optional
 from pyJoules.energy_meter import EnergyMeter
@@ -8,6 +9,7 @@ from pyJoules.device.device_factory import DeviceFactory
 
 from handler import ProcessEnergySample, ProcessEnergyHandler
 from csv_handler import CSVHandler
+from utils import detect_sockets
 
 class ProcessEnergyMonitorError(Exception):
     pass
@@ -16,32 +18,50 @@ class ProcessNotFoundError(ProcessEnergyMonitorError):
     pass
 
 class ProcessEnergyMonitor:
-    def __init__(self, pid: int, handler: ProcessEnergyHandler, socket: int = 0, sampling_interval: float = 0.1):
-        self.pid = pid
+    def __init__(self, cmd: str, handler: ProcessEnergyHandler, sampling_interval: float = 0.1):
+        """
+        Initializes the energy monitor for a specific process.
+
+        Args:
+            cmd (str, optional): A shell command to execute and monitor.
+            handler (ProcessEnergyHandler): Handler for processing energy samples and summaries.
+            sampling_interval (float): Sampling interval in seconds.
+        """
+
+        self.cmd = cmd
         self.handler = handler
         self.sampling_interval = sampling_interval
-        self.socket = socket
-        self.num_cores = psutil.cpu_count(logical=True) or 1
 
-        # TODO: check if the socket is valid, auto detect if not provided
-        domains = [RaplPackageDomain(socket)]
+        self.sockets = detect_sockets()
+        domains = [RaplPackageDomain(socket_id) for socket_id in self.sockets]
+
         devices = DeviceFactory.create_devices(domains)
         self.meter = EnergyMeter(devices)
+
+        # Get number of logical CPU cores
+        self.num_cores = psutil.cpu_count(logical=True) or 1
 
         self.reset_state()
 
     def reset_state(self):
         """
-        Resets the internal state of the monitor
+        Resets internal state before starting a new monitoring session.
         """
+       
         self.start_time = datetime.now()
         self.total_rapl = 0.0
         self.total_process = 0.0
-        self._process_tree = []
+        self.process_tree = []
 
-    def _get_process_tree(self) -> List[psutil.Process]:
+    def get_process_tree(self) -> List[psutil.Process]:
         """
-        Retrieves the process tree for the given PID.
+        Retrieves the main process and all of its child processes.
+
+        Returns:
+            List[psutil.Process]: The complete process tree.
+
+        Raises:
+            ProcessNotFoundError: If the main process does not exist.
         """
 
         try:
@@ -49,40 +69,43 @@ class ProcessEnergyMonitor:
             return [main_process] + main_process.children(recursive=True)
         except psutil.NoSuchProcess:
             raise ProcessNotFoundError(f"Process {self.pid} not found")
-
-    def calculate_proc_energy(self, proc: psutil.Process, total_energy: float) -> float:
-        """
-        Calculates the energy consumed by a specific process based on its CPU usage.
-        """
-        try:
-            cpu_percent = proc.cpu_percent(interval=0.1)
-            return cpu_percent, total_energy * ((cpu_percent / 100) / self.num_cores)
-        except Exception:
-            return 0.0
         
     def warmup_cpu(self):
-        
+        """
+        Performs a warm-up CPU usage measurement for all processes in the tree.
+        This initializes internal CPU counters for accurate measurement.
+        """
         try:
-            self._process_tree = self._get_process_tree()
-            for p in self._process_tree:
-                p.cpu_percent(interval=0.1)
-        except Exception:
-            pass
+            for p in self.process_tree:
+                p.cpu_percent(interval=None) # initialize CPU
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass  
 
     def take_measurement(self) -> Optional[ProcessEnergySample]:
         """
-        Takes a measurement of the energy consumed by the process and its children.
+        Takes a single energy measurement for the process and its children.
+
+        Returns:
+            ProcessEnergySample or None if measurement failed or the process ended.
         """
+
         try:
-            self._process_tree = self._get_process_tree()
-            print(f"Monitoring process tree for PID {self.pid}: {[p.pid for p in self._process_tree]}")
+            self.process_tree = self.get_process_tree()
+            print(f"Monitoring process tree for PID {self.pid}: {[p.pid for p in self.process_tree]}")
         except ProcessNotFoundError:
             return None
 
+        self.warmup_cpu()
+
+        # Measure total system CPU usage
+        cpu_system = psutil.cpu_percent(interval=None)
+
+        # Start energy measurement
         self.meter.start()
         time.sleep(self.sampling_interval)
         self.meter.stop()
 
+        
         energy_data = self.meter.get_trace()
         if not energy_data:
             return None
@@ -93,24 +116,30 @@ class ProcessEnergyMonitor:
         current_rapl = sum(energy_by_domain.values())  # µJ
         self.total_rapl += current_rapl
 
-        # Calculate total process energy
+        # Estimate energy usage of each process in the tree
         cpu_total = 0.0
         current_process = 0.0
 
-        for p in self._process_tree:
+        for p in self.process_tree:
             try:
-                cpu_p, energy_p = self.calculate_proc_energy(p, current_rapl)
+                
+                cpu_p = p.cpu_percent(interval=None)
+                cpu_normalized = cpu_p / self.num_cores
+
+                energy_p = current_rapl * ( cpu_normalized / 100 )
+
                 current_process += energy_p
-                cpu_total += cpu_p
+                cpu_total += cpu_normalized
+                
             except psutil.NoSuchProcess:
                 continue
 
         self.total_process += current_process
-        
-        # Debug print
+
+        # Debug output
         print(  
             f"PID {self.pid} | "
-            f"CPU: {cpu_total} | "
+            f"CPU: {cpu_total:.2f} [{cpu_system:.2f}%] | "
             f"Proc: {current_process / 1_000_000:.2f} J | "
             f"Tot Proc: {self.total_process / 1_000_000:.2f} J | "
             f"Tot RAPL: {self.total_rapl / 1_000_000:.2f} J"
@@ -125,8 +154,17 @@ class ProcessEnergyMonitor:
         )
 
     def monitor(self):
+        """
+        Continuously monitors the process until it terminates.
+        """
+
         self.reset_state()
-        self.warmup_cpu()
+
+        if self.cmd:
+            self.process = subprocess.Popen(self.cmd, shell=True)
+            self.pid = self.process.pid
+        else:
+            raise ValueError("No command provided to monitor.")
 
         try:
             while psutil.pid_exists(self.pid) and psutil.Process(self.pid).is_running():
@@ -139,6 +177,9 @@ class ProcessEnergyMonitor:
         self.log_summary()
 
     def log_summary(self):
+        """
+        Logs and passes the total energy summary to the handler.
+        """
         duration = datetime.now() - self.start_time
         summary = {
             'duration': str(duration),
@@ -148,7 +189,6 @@ class ProcessEnergyMonitor:
         self.handler.handle_summary(summary)
 
 if __name__ == "__main__":
-    pid = int(input("Enter PID to monitor: "))
     handler = CSVHandler()
-    monitor = ProcessEnergyMonitor(pid=pid, handler=handler)
+    monitor = ProcessEnergyMonitor(cmd="python3 cpu.py", handler=handler)
     monitor.monitor()
