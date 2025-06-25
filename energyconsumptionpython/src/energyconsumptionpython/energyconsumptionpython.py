@@ -1,15 +1,16 @@
 import psutil
 import time
 import subprocess
+import shlex
 from datetime import datetime
 from typing import List, Optional
+from pyJoules.device.rapl_device import Domain, RaplPackageDomain
 from pyJoules.energy_meter import EnergyMeter
-from pyJoules.device.rapl_device import RaplPackageDomain
 from pyJoules.device.device_factory import DeviceFactory
+from pyJoules.handler.pandas_handler import PandasHandler
+import pandas as pd
 
-from handler import ProcessEnergySample, ProcessEnergyHandler
-from csv_handler import CSVHandler
-from utils import detect_sockets
+from handler import ProcessEnergySample
 
 class ProcessEnergyMonitorError(Exception):
     pass
@@ -18,28 +19,26 @@ class ProcessNotFoundError(ProcessEnergyMonitorError):
     pass
 
 class ProcessEnergyMonitor:
-    def __init__(self, cmd: str, handler: ProcessEnergyHandler, sampling_interval: float = 0.1):
+    def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1):
         """
         Initializes the energy monitor for a specific process.
 
         Args:
             cmd (str, optional): A shell command to execute and monitor.
-            handler (ProcessEnergyHandler): Handler for processing energy samples and summaries.
             sampling_interval (float): Sampling interval in seconds.
         """
 
         self.cmd = cmd
-        self.handler = handler
+        
         self.sampling_interval = sampling_interval
+        
+        self.domains = domains
+        self.devices = DeviceFactory.create_devices(domains)
+        self.meter = EnergyMeter(devices=self.devices)
+        self.cpu_meter = pd.DataFrame(columns=['tag', 'cpu'])
+        self.handler = PandasHandler()
 
-        self.sockets = detect_sockets()
-        domains = [RaplPackageDomain(socket_id) for socket_id in self.sockets]
-
-        devices = DeviceFactory.create_devices(domains)
-        self.meter = EnergyMeter(devices)
-
-        # Get number of logical CPU cores
-        self.num_cores = psutil.cpu_count(logical=True) or 1
+        self.num_cores = psutil.cpu_count(logical=True) or 1 # number of logical CPU cores
 
         self.reset_state()
 
@@ -47,11 +46,12 @@ class ProcessEnergyMonitor:
         """
         Resets internal state before starting a new monitoring session.
         """
-       
         self.start_time = datetime.now()
         self.total_rapl = 0.0
         self.total_process = 0.0
         self.process_tree = []
+        self.cpu_meter = pd.DataFrame(columns=['tag', 'cpu'])
+        self.counter = 1
 
     def get_process_tree(self) -> List[psutil.Process]:
         """
@@ -82,13 +82,6 @@ class ProcessEnergyMonitor:
             pass  
 
     def take_measurement(self) -> Optional[ProcessEnergySample]:
-        """
-        Takes a single energy measurement for the process and its children.
-
-        Returns:
-            ProcessEnergySample or None if measurement failed or the process ended.
-        """
-
         try:
             self.process_tree = self.get_process_tree()
             print(f"Monitoring process tree for PID {self.pid}: {[p.pid for p in self.process_tree]}")
@@ -97,98 +90,96 @@ class ProcessEnergyMonitor:
 
         self.warmup_cpu()
 
-        # Measure total system CPU usage
-        cpu_system = psutil.cpu_percent(interval=None)
-
-        # Start energy measurement
-        self.meter.start()
+        # Wait for delta accumulation
         time.sleep(self.sampling_interval)
-        self.meter.stop()
 
-        
-        energy_data = self.meter.get_trace()
-        if not energy_data:
-            return None
-
-        # Get last RAPL energy measurement
-        last = energy_data[-1]
-        energy_by_domain = last.energy
-        current_rapl = sum(energy_by_domain.values())  # µJ
-        self.total_rapl += current_rapl
-
-        # Estimate energy usage of each process in the tree
         cpu_total = 0.0
-        current_process = 0.0
-
         for p in self.process_tree:
             try:
-                
-                cpu_p = p.cpu_percent(interval=None)
-                cpu_normalized = cpu_p / self.num_cores
-
-                energy_p = current_rapl * ( cpu_normalized / 100 )
-
-                current_process += energy_p
-                cpu_total += cpu_normalized
-                
-            except psutil.NoSuchProcess:
+                cpu_p = p.cpu_percent(interval=None) / self.num_cores  # Normalize by number of cores
+                cpu_total += cpu_p
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        self.total_process += current_process
+        if cpu_total == 0.0:
+            return None
 
-        # Debug output
-        print(  
+        # Measure total system CPU
+        cpu_system = psutil.cpu_percent(interval=0.0)
+
+        # Record RAPL energy for this sample
+        self.meter.record(tag=f"{self.counter}")
+
+        print(
             f"PID {self.pid} | "
-            f"CPU: {cpu_total:.2f} [{cpu_system:.2f}%] | "
-            f"Proc: {current_process / 1_000_000:.2f} J | "
-            f"Tot Proc: {self.total_process / 1_000_000:.2f} J | "
-            f"Tot RAPL: {self.total_rapl / 1_000_000:.2f} J"
+            f"CPU: {cpu_total:.2f}% [Total system: {cpu_system:.2f}%] | "
         )
 
-        return ProcessEnergySample(
-            timestamp=datetime.now(),
-            pid=self.pid,
-            cpu_percent=cpu_total,
-            process_energy=current_process,
-            rapl_energy=self.total_rapl
-        )
+        sample = [{'tag': self.counter, 'cpu': cpu_total}]
+        self.counter += 1
+        return sample
+
 
     def monitor(self):
         """
         Continuously monitors the process until it terminates.
         """
 
-        self.reset_state()
-
-        if self.cmd:
-            self.process = subprocess.Popen(self.cmd, shell=True)
-            self.pid = self.process.pid
-        else:
-            raise ValueError("No command provided to monitor.")
+        args = shlex.split(self.cmd)
+        self.process = subprocess.Popen(args, shell=False)
+        self.pid = self.process.pid
+       
+        # Start monitoring RAPL
+        self.meter.start(tag="0")
 
         try:
-            while psutil.pid_exists(self.pid) and psutil.Process(self.pid).is_running():
-                sample = self.take_measurement()
-                # if sample:
-                #     self.handler.handle(sample)
+            while self.process.poll() is None:
+                cpu_sample = self.take_measurement()
+
+                if cpu_sample is not None:
+                    self.cpu_meter = pd.concat([self.cpu_meter, pd.DataFrame(cpu_sample)], ignore_index=True)
+                
+                # Wait for the next cpu measurement
+                time.sleep(self.sampling_interval) 
+
         except ProcessNotFoundError:
             pass
+        
+        # Stop monitoring RAPL
+        self.meter.stop()
 
-        self.log_summary()
+        self.handler.process(self.meter.get_trace())
+        rapl_df = self.handler.get_dataframe()
 
-    def log_summary(self):
+        # Rename the last column to 'rapl'
+        last_col_name = rapl_df.columns[-1]
+        rapl_df = rapl_df.rename(columns={last_col_name: 'rapl'})
+        
+        # Total RAPL energy after process termination
+        self.total_rapl = rapl_df.iloc[:, -1].sum() / 1_000_000 # Convert to Joules
+        
+        # Total energy for the process
+        self.total_process = self.calculate_process_energy(rapl_df, self.cpu_meter)
+        
+        print(f"Domain energy consumption: {self.total_rapl:.2f} J")
+        print(f"Total process energy consumption: {self.total_process:.2f} J")
+        
+    
+    def calculate_process_energy(self, rapl_df, cpu_df) -> float:
         """
-        Logs and passes the total energy summary to the handler.
+        Calculates the total energy consumed by the process based on CPU usage.
+
+        Returns:
+            float: Total energy consumed by the process in Joules.
         """
-        duration = datetime.now() - self.start_time
-        summary = {
-            'duration': str(duration),
-            'total_process': self.total_process,
-            'total_rapl': self.total_rapl,
-        }
-        self.handler.handle_summary(summary)
+
+        rapl_df['tag'] = rapl_df['tag'].astype(int)
+        cpu_df['tag'] = cpu_df['tag'].astype(int)
+        df_merged = pd.merge(rapl_df, cpu_df, on='tag')
+        df_merged['energy_uJ'] = (df_merged['cpu'] / 100) * df_merged['rapl']        
+        
+        return df_merged["energy_uJ"].sum() / 1_000_000 # Convert to Joules
 
 if __name__ == "__main__":
-    handler = CSVHandler()
-    monitor = ProcessEnergyMonitor(cmd="python3 cpu.py", handler=handler)
+    monitor = ProcessEnergyMonitor(domains=[RaplPackageDomain(0)],cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456")
     monitor.monitor()

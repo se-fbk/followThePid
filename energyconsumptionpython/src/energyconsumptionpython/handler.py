@@ -2,12 +2,10 @@ from typing import Dict
 from datetime import datetime
 
 class ProcessEnergySample:
-    def __init__(self, timestamp: datetime, pid: int, cpu_percent: float, process_energy: float, rapl_energy: float):
-        self.timestamp = timestamp
+    def __init__(self, id: int, pid: int, cpu_percent: float):
+        self.id = id
         self.pid = pid
         self.cpu_percent = cpu_percent
-        self.process_energy = process_energy
-        self.rapl_energy = rapl_energy
 
 class ProcessEnergyHandler:
     """Classe base per handler di misurazioni energetiche"""
