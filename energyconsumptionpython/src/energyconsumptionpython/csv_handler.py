@@ -1,33 +1,24 @@
 import csv
-from typing import Dict
-from handler import ProcessEnergyHandler, ProcessEnergySample
+from typing import Dict, List
+from datetime import datetime
+from handler import ProcessEnergyHandler
 
 class CSVHandler(ProcessEnergyHandler):
-    def __init__(self, log_filename: str = "energy_log.csv", summary_filename: str = "energy_summary.csv"):
-        self.log_filename = log_filename
-        self.summary_filename = summary_filename
+    def __init__(self, filename: str = "energyconsumption.csv"):
+        super().__init__()
+        self.filename = filename
+    
+    def summary(self) -> bool:
+        """
+        Writes the energy consumption summary to a CSV file.
+        """
+        if not self.samples:
+            return False
+        
+        with open(self.filename, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["id", "pid", "cpu_percent", "energy_uj"])
+            for sample in self.samples:
+                writer.writerow([sample.id, sample.pid, sample.cpu_percent, sample.energy])
 
-        with open(self.log_filename, 'w', newline='') as log_file:
-            writer = csv.writer(log_file)
-            writer.writerow(['PID', 'Timestamp', 'CPU (%)', 'Process Energy (uJ)', 'RAPL Energy (uJ)'])
-
-        with open(self.summary_filename, 'w', newline='') as summary_file:
-            writer = csv.writer(summary_file)
-            writer.writerow(['Metric', 'Value'])
-
-    def handle(self, sample: ProcessEnergySample):
-        with open(self.log_filename, 'a', newline='') as log_file:
-            writer = csv.writer(log_file)
-            writer.writerow([
-                sample.pid,
-                sample.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                round(sample.cpu_percent, 2),
-                round(sample.process_energy, 2),
-                round(sample.rapl_energy, 2)
-            ])
-
-    def handle_summary(self, summary: Dict):
-        with open(self.summary_filename, 'a', newline='') as summary_file:
-            writer = csv.writer(summary_file)
-            for key, value in summary.items():
-                writer.writerow([key, value])
+        return True
