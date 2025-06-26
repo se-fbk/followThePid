@@ -1,8 +1,6 @@
 # followThePid
 
-**followThePid** is a Python library for tracing the **CPU usage** and **energy consumption** of a running process using its PID.  
-
-It uses **Intel RAPL** interfaces (via [`pyJoules`](https://github.com/powerapi-ng/pyJoules)) and [`psutil`](https://github.com/giampaolo/psutil) to follow a process and all its children, collecting fine-grained energy and performance metrics over time.
+**followThePid** is a Python library for tracing the **CPU usage** and **energy consumption** of a running process using its PID.  It uses **Intel RAPL** interfaces (via [`pyJoules`](https://github.com/powerapi-ng/pyJoules)) and [`psutil`](https://github.com/giampaolo/psutil) to follow a process and all its children, collecting fine-grained energy and performance metrics over time.
 
 ---
 
@@ -12,8 +10,8 @@ It uses **Intel RAPL** interfaces (via [`pyJoules`](https://github.com/powerapi-
 - Option to normalize CPU usage per core (iris mode)
 - Uses Intel RAPL (via `pyJoules`) for energy measurements
 - Built-in support for saving data as:
-  - CSV
-  - Pandas DataFrame (for analysis)
+  - CSV file
+  - Pandas DataFrame
 ---
 
 ## Requirements
