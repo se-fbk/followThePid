@@ -1,1 +1,0 @@
-sudo chmod a+r /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj

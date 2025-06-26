@@ -11,7 +11,7 @@ class ProcessEnergyMonitorError(Exception):
 class ProcessNotFoundError(ProcessEnergyMonitorError):
     pass
 
-class ProcessEnergyMonitor:
+class FollowThePid:
     def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1, iris_mode: bool = True, handler: Optional[ProcessEnergyHandler] = None):
         """
         Initializes the energy monitor for a specific process.
@@ -144,7 +144,7 @@ if __name__ == "__main__":
 
     # Test ProcessEnergyMonitor with a Pandas Handler
     handler = PandasHandler()
-    monitor = ProcessEnergyMonitor(
+    monitor = FollowThePid(
         domains=[RaplPackageDomain(0)],
         cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
         handler=handler
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     
     # Test ProcessEnergyMonitor with a CSV Handler
     handler = CSVHandler()
-    monitor = ProcessEnergyMonitor(
+    monitor = FollowThePid(
         domains=[RaplPackageDomain(0)],
         cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
         handler=handler
