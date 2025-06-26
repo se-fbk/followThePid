@@ -3,7 +3,7 @@ import psutil, time, subprocess, shlex, logging
 from typing import List, Optional
 from pyJoules.device.rapl_device import Domain, RaplPackageDomain
 from pyJoules.device.device_factory import DeviceFactory
-from handler import ProcessEnergySample, ProcessEnergyHandler
+from handler import ProcessEnergySample, ProcessEnergyHandler, CSVHandler, PandasHandler
 
 class ProcessEnergyMonitorError(Exception):
     pass
@@ -12,7 +12,7 @@ class ProcessNotFoundError(ProcessEnergyMonitorError):
     pass
 
 class ProcessEnergyMonitor:
-    def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1, iris_mode: bool = True):
+    def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1, iris_mode: bool = True, handler: Optional[ProcessEnergyHandler] = None):
         """
         Initializes the energy monitor for a specific process.
 
@@ -25,7 +25,7 @@ class ProcessEnergyMonitor:
         self.cmd = cmd
         self.sampling_interval = sampling_interval
         self.devices = DeviceFactory.create_devices(domains=domains)
-        self.handler = ProcessEnergyHandler()
+        self.handler = handler if handler is not None else CSVHandler()
         self.num_cores = psutil.cpu_count(logical=True) or 1 # number of logical CPU cores
         self.iris_mode = iris_mode
         
@@ -39,7 +39,6 @@ class ProcessEnergyMonitor:
         """
         self.process_tree = []
         self.counter = 0
-        self.handler = ProcessEnergyHandler()
 
 
     def get_process_tree(self) -> List[psutil.Process]:
@@ -140,11 +139,29 @@ class ProcessEnergyMonitor:
         logging.info(f"Domain energy consumption: {total_rapl_system:.2f} J")
         logging.info(f"Total process energy consumption: {total_rapl_pid:.2f} J")
         
-        return total_rapl_system, total_rapl_pid
 
 if __name__ == "__main__":
 
-    monitor = ProcessEnergyMonitor(domains=[RaplPackageDomain(0)],cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456")
-    total, pid = monitor.monitor()
-    print(f"System Energy: {total:.2f} J")
-    print(f"Process Energy: {pid:.2f} J")
+    # Test ProcessEnergyMonitor with a Pandas Handler
+    handler = PandasHandler()
+    monitor = ProcessEnergyMonitor(
+        domains=[RaplPackageDomain(0)],
+        cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
+        handler=handler
+    )
+    
+    monitor.monitor()
+    df = handler.summary()
+    print(df)
+    
+    # Test ProcessEnergyMonitor with a CSV Handler
+    handler = CSVHandler()
+    monitor = ProcessEnergyMonitor(
+        domains=[RaplPackageDomain(0)],
+        cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
+        handler=handler
+    )
+    
+    monitor.monitor()
+    bool = handler.summary()
+    print(bool)

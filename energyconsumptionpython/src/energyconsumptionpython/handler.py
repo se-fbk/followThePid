@@ -1,5 +1,6 @@
 from typing import Dict
-from datetime import datetime
+import pandas as pd
+import csv
 
 class ProcessEnergySample:
     def __init__(self, id: int, pid: int, cpu_percent: float, energy: float):
@@ -56,3 +57,48 @@ class ProcessEnergyHandler:
 
     def summary(self, summary: Dict):
         raise NotImplementedError("Override required")
+
+# === Pandas summary handler ===
+
+class PandasHandler(ProcessEnergyHandler):
+    def __init__(self):
+        super().__init__()
+        
+    def summary(self) -> pd.DataFrame:
+        """
+        Converts the energy samples into a Pandas DataFrame,
+        """
+        if not self.samples:
+            return pd.DataFrame()
+        
+        data = [{
+            "id": sample.id,
+            "pid": sample.pid,
+            "cpu_percent": sample.cpu_percent,
+            "energy_uj": sample.energy
+        } for sample in self.samples]
+
+        df = pd.DataFrame(data)
+        return df
+    
+# === CSV summary handler ===
+
+class CSVHandler(ProcessEnergyHandler):
+    def __init__(self, filename: str = "energyconsumption.csv"):
+        super().__init__()
+        self.filename = filename
+
+    def summary(self) -> bool:
+        """
+        Writes the energy consumption summary to a CSV file.
+        """
+        if not self.samples:
+            return False
+        
+        with open(self.filename, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["id", "pid", "cpu_percent", "energy_uj"])
+            for sample in self.samples:
+                writer.writerow([sample.id, sample.pid, sample.cpu_percent, sample.energy])
+
+        return True
