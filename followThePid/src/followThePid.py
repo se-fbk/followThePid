@@ -12,7 +12,7 @@ class ProcessNotFoundError(ProcessEnergyMonitorError):
     pass
 
 class FollowThePid:
-    def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1, iris_mode: bool = True, handler: Optional[ProcessEnergyHandler] = None):
+    def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1, irix_mode: bool = True, handler: Optional[ProcessEnergyHandler] = None):
         """
         Initializes the energy monitor for a specific process.
 
@@ -20,6 +20,8 @@ class FollowThePid:
             cmd (str, optional): A shell command to execute and monitor
             domains (List[Domain], optional): List of RAPL domains to monitor
             sampling_interval (float): Sampling interval in seconds
+            irix_mode (bool): If True, uses IRIX mode for CPU percentage calculation
+            handler (ProcessEnergyHandler, optional): Handler for processing energy samples
         """
 
         self.cmd = cmd
@@ -27,7 +29,7 @@ class FollowThePid:
         self.devices = DeviceFactory.create_devices(domains=domains)
         self.handler = handler if handler is not None else CSVHandler()
         self.num_cores = psutil.cpu_count(logical=True) or 1 # number of logical CPU cores
-        self.iris_mode = iris_mode
+        self.irix_mode = irix_mode
         
         self.reset_state()
 
@@ -85,10 +87,10 @@ class FollowThePid:
         cpu_total = 0.0
         for p in self.process_tree: 
             try:
-                if self.iris_mode:
+                if self.irix_mode:
                     cpu_p = p.cpu_percent(interval=None)
                 else:
-                    cpu_p = p.cpu_percent(interval=None) / self.num_cores  # normalize by number of cores (see Iris mode off using top)
+                    cpu_p = p.cpu_percent(interval=None) / self.num_cores  # normalize by number of cores (see Irix mode off using top)
 
                 cpu_total += cpu_p
             except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -100,7 +102,7 @@ class FollowThePid:
         energy = self.get_energy_from_rapl_devices() #uJ
 
         logging.info(
-            f"CPU (iris mode={self.iris_mode}): {cpu_total:.2f}% | CPU Sys: {psutil.cpu_percent(interval=0.0):.2f}%] | "
+            f"CPU (irix mode={self.irix_mode}): {cpu_total:.2f}% | CPU Sys: {psutil.cpu_percent(interval=0.0):.2f}%] | "
             f"Rapl: {energy:.2f} uJ | " 
             f"Pids: {[p.pid for p in self.process_tree]}"
         ) # debug print
