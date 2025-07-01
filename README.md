@@ -46,7 +46,7 @@ monitor = FollowThePid(
     cmd="python my_script.py",
     domains=[RaplPackageDomain(0)],  # adjust depending on your hardware
     sampling_interval=0.1,
-    iris_mode=True,
+    irix_mode=True,
     handler=handler
 )
 
