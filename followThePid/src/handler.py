@@ -3,11 +3,12 @@ import pandas as pd
 import csv
 
 class ProcessEnergySample:
-    def __init__(self, id: int, pid: int, cpu_percent: float, energy: float):
+    def __init__(self, id: int, pid: int, cpu_percent: float, energy: float, cpu_system:float):
         self.id = id
         self.pid = pid
         self.cpu_percent = cpu_percent
         self.energy = energy
+        self.cpu_system = cpu_system
 
 class ProcessEnergyHandler:
 
@@ -43,9 +44,11 @@ class ProcessEnergyHandler:
         total_energy = 0.0
 
         for prev, curr in zip(self.samples, self.samples[1:]):
-            energy_delta = curr.energy - prev.energy  # delta energia totale (µJ)
-            cpu_usage = curr.cpu_percent  # valore normalizzato [0,1]
-            total_energy += energy_delta * cpu_usage
+            energy_delta = curr.energy - prev.energy  # uJ
+            cpu_usage = curr.cpu_percent  # [0,1]
+            cpu_system = curr.cpu_system # [0,1]
+
+            total_energy += (energy_delta * cpu_usage) / cpu_system
 
         return total_energy / 1_000_000  # Convert from microjoules to joules
 
@@ -75,6 +78,7 @@ class PandasHandler(ProcessEnergyHandler):
             "id": sample.id,
             "pid": sample.pid,
             "cpu_percent": sample.cpu_percent,
+            "cpu_sys": sample.cpu_system,
             "energy_uj": sample.energy
         } for sample in self.samples]
 
@@ -97,8 +101,8 @@ class CSVHandler(ProcessEnergyHandler):
         
         with open(self.filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["id", "pid", "cpu_percent", "energy_uj"])
+            writer.writerow(["id", "pid", "cpu_percent", "cpu_sys", "energy_uj"])
             for sample in self.samples:
-                writer.writerow([sample.id, sample.pid, sample.cpu_percent, sample.energy])
+                writer.writerow([sample.id, sample.pid, sample.cpu_percent, sample.cpu_system, sample.energy])
 
         return True

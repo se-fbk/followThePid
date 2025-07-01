@@ -100,9 +100,10 @@ class FollowThePid:
             return None
 
         energy = self.get_energy_from_rapl_devices() #uJ
+        cpu_system = psutil.cpu_percent(interval=0.0)
 
         logging.info(
-            f"CPU (irix mode={self.irix_mode}): {cpu_total:.2f}% | CPU Sys: {psutil.cpu_percent(interval=0.0):.2f}%] | "
+            f"CPU (irix mode={self.irix_mode}): {cpu_total:.2f}% | CPU Sys: {cpu_system:.2f}%] | "
             f"Rapl: {energy:.2f} uJ | " 
             f"Pids: {[p.pid for p in self.process_tree]}"
         ) # debug print
@@ -111,6 +112,7 @@ class FollowThePid:
             id = self.counter,
             pid = self.pid,
             cpu_percent = cpu_total / 100, # [0,1]
+            cpu_system = cpu_system / 100, # [0,1]
             energy = energy # uJ
         )
 
@@ -138,8 +140,8 @@ class FollowThePid:
         total_rapl_system = self.handler.get_system_energy()
         total_rapl_pid = self.handler.get_pid_energy()
         
-        logging.info(f"Domain energy consumption: {total_rapl_system:.2f} J")
-        logging.info(f"Total process energy consumption: {total_rapl_pid:.2f} J")
+        logging.warning(f"Domain energy consumption: {total_rapl_system:.2f} J")
+        logging.warning(f"Total process energy consumption: {total_rapl_pid:.2f} J")
         
 
 if __name__ == "__main__":
@@ -149,21 +151,10 @@ if __name__ == "__main__":
     monitor = FollowThePid(
         domains=[RaplPackageDomain(0)],
         cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
-        handler=handler
+        handler=handler,
+        irix_mode=False,
     )
     
     monitor.monitor()
     df = handler.summary()
     print(df)
-    
-    # Test ProcessEnergyMonitor with a CSV Handler
-    handler = CSVHandler()
-    monitor = FollowThePid(
-        domains=[RaplPackageDomain(0)],
-        cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
-        handler=handler
-    )
-    
-    monitor.monitor()
-    bool = handler.summary()
-    print(bool)
