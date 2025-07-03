@@ -1,8 +1,6 @@
 import psutil, time, subprocess, shlex, logging
-
-from typing import List, Optional
-from pyJoules.device.rapl_device import Domain, RaplPackageDomain
-from pyJoules.device.device_factory import DeviceFactory
+from device.device import Device
+from typing import Optional
 from handler import ProcessEnergySample, ProcessEnergyHandler, CSVHandler, PandasHandler
 
 class ProcessEnergyMonitorError(Exception):
@@ -12,7 +10,7 @@ class ProcessNotFoundError(ProcessEnergyMonitorError):
     pass
 
 class FollowThePid:
-    def __init__(self, cmd: str, domains: Optional[List[Domain]], sampling_interval: float = 0.1, irix_mode: bool = True, handler: Optional[ProcessEnergyHandler] = None):
+    def __init__(self, cmd: str, sampling_interval: float = 0.1, handler: Optional[ProcessEnergyHandler] = None):
         """
         Initializes the energy monitor for a specific process.
 
@@ -20,20 +18,24 @@ class FollowThePid:
             cmd (str, optional): A shell command to execute and monitor
             domains (List[Domain], optional): List of RAPL domains to monitor
             sampling_interval (float): Sampling interval in seconds
-            irix_mode (bool): If True, uses IRIX mode for CPU percentage calculation
             handler (ProcessEnergyHandler, optional): Handler for processing energy samples
         """
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
         self.cmd = cmd
         self.sampling_interval = sampling_interval
-        self.devices = DeviceFactory.create_devices(domains=domains)
+        self.device = Device()
+
+        if not self.device:
+            raise ProcessEnergyMonitorError("No RAPL device found. Ensure you are running on a supported platform with RAPL support.")
+        
+        logging.info(f"Using RAPL device: {self.device.domain}")
+
         self.handler = handler if handler is not None else CSVHandler()
-        self.num_cores = psutil.cpu_count(logical=True) or 1 # number of logical CPU cores
-        self.irix_mode = irix_mode
+        self.num_cores = psutil.cpu_count(logical=True) or 1 
         
         self.reset_state()
 
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', flush=True)
 
     def reset_state(self):
         """
@@ -42,8 +44,7 @@ class FollowThePid:
         self.process_tree = []
         self.counter = 0
 
-
-    def get_process_tree(self) -> List[psutil.Process]:
+    def get_process_tree(self) -> list:
         """
         Retrieves the main process and all of its child processes.
         """
@@ -60,21 +61,10 @@ class FollowThePid:
         try:
             for p in self.process_tree:
                 p.cpu_percent(interval=None) # initialize CPU
+                
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass  
     
-    def get_energy_from_rapl_devices(self) -> float:
-        """
-        Retrieves the energy consumption from all configured RAPL devices.
-        """
-        total=0.00 
-        for device in self.devices:
-            energy = device.get_energy()
-            for domain, e in zip(device.get_configured_domains(), energy):
-                total += e
-        
-        return total #uJ
-
     def take_measurement(self) -> Optional[ProcessEnergySample]:
 
         try:
@@ -87,25 +77,23 @@ class FollowThePid:
         cpu_total = 0.0
         for p in self.process_tree: 
             try:
-                if self.irix_mode:
-                    cpu_p = p.cpu_percent(interval=None)
-                else:
-                    cpu_p = p.cpu_percent(interval=None) / self.num_cores  # normalize by number of cores (see Irix mode off using top)
-
+                cpu_p = p.cpu_percent(interval=None) / self.num_cores  # normalize by number of cores
                 cpu_total += cpu_p
+
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
-
-        if cpu_total == 0.0:
-            return None
-
-        energy = self.get_energy_from_rapl_devices() #uJ
+                
+        energy = self.device.get_energy() #uJ
         cpu_system = psutil.cpu_percent(interval=0.0)
+        
+        # avoid division by zero
+        if cpu_system == 0.0:
+            return None 
 
         logging.info(
-            f"CPU (irix mode={self.irix_mode}): {cpu_total:.2f}% | CPU Sys: {cpu_system:.2f}%] | "
+            f"CPU: {cpu_total:.2f}% | CPU Sys: {cpu_system:.2f}%] | "
             f"Rapl: {energy:.2f} uJ | " 
-            f"Pids: {[p.pid for p in self.process_tree]}"
+            f"PIDs: {[p.pid for p in self.process_tree]}"
         ) # debug print
 
         sample = ProcessEnergySample(
@@ -113,7 +101,7 @@ class FollowThePid:
             pid = self.pid,
             cpu_percent = cpu_total / 100, # [0,1]
             cpu_system = cpu_system / 100, # [0,1]
-            energy = energy # uJ
+            energy = energy, # uJ
         )
 
         self.counter += 1
@@ -126,7 +114,7 @@ class FollowThePid:
         args = shlex.split(self.cmd)
         self.process = subprocess.Popen(args, shell=False)
         self.pid = self.process.pid
-        
+
         # Start monitoring
         try:
             while self.process.poll() is None:
@@ -140,19 +128,16 @@ class FollowThePid:
         total_rapl_system = self.handler.get_system_energy()
         total_rapl_pid = self.handler.get_pid_energy()
         
-        logging.warning(f"Domain energy consumption: {total_rapl_system:.2f} J")
-        logging.warning(f"Total process energy consumption: {total_rapl_pid:.2f} J")
+        logging.info(f"Domain energy consumption: {total_rapl_system:.2f} J")
+        logging.info(f"Total process energy consumption: {total_rapl_pid:.2f} J")
         
-
 if __name__ == "__main__":
 
     # Test ProcessEnergyMonitor with a Pandas Handler
     handler = PandasHandler()
     monitor = FollowThePid(
-        domains=[RaplPackageDomain(0)],
         cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
-        handler=handler,
-        irix_mode=False,
+        handler=handler
     )
     
     monitor.monitor()
