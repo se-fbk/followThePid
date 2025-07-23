@@ -1,5 +1,6 @@
 import os
-from .device_base import DeviceBase
+import time
+from .base import DeviceBase
 
 class DeviceLinux(DeviceBase):
     SOURCES = [
@@ -8,9 +9,11 @@ class DeviceLinux(DeviceBase):
         "/sys/class/powercap/intel-rapl:0:0/"
     ]
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, sampling_interval: float = 0.1):
+        
+        super().__init__(sampling_interval)
         self.domain = self.setup()
+        self.sampling_interval = sampling_interval
 
     def _is_readable(self, path: str) -> bool:
         """
@@ -27,17 +30,17 @@ class DeviceLinux(DeviceBase):
                 return path
         raise RuntimeError("No readable RAPL source found.")
 
-    def get_energy(self):
+    def _read_domain(self):
         """
         Read the energy consumption from the RAPL domain.
         """
         try:
             with open(os.path.join(self.domain, "energy_uj")) as f:
-                return float(f.read().strip())
+                return float(f.read().strip()) # uJ
         except Exception as e:
             raise RuntimeError(f"Error reading energy_uj: {e}")
-
-    def get_max_energy(self):
+       
+    def _get_max_energy(self):
         """
         Read the maximum energy range from the RAPL domain.
         """
@@ -47,7 +50,7 @@ class DeviceLinux(DeviceBase):
         except Exception as e:
             raise RuntimeError(f"Error reading max_energy_range_uj: {e}")
         
-    def get_device_name(self):
+    def _get_device_name(self):
         """
         Read the device name from the RAPL domain.
         """
@@ -56,3 +59,20 @@ class DeviceLinux(DeviceBase):
                 return str(f.read().strip())
         except Exception as e:
             raise RuntimeError(f"Error reading device name: {e}")
+
+    def get_energy(self):
+            try:
+                energy_start = self._read_domain()
+                time.sleep(self.sampling_interval)
+                energy_end = self._read_domain()
+
+                if energy_end < energy_start:
+                    # Overflow detected, calculate the energy used
+                    max_energy = self._get_max_energy()
+                    energy_used = (max_energy - energy_start) + energy_end
+                else:
+                    energy_used = energy_end - energy_start
+
+                return energy_used  #uJ
+            except Exception as e:
+                raise RuntimeError(f"Error calculating energy consumption : {e}")
