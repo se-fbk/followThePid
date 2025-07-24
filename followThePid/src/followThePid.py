@@ -98,9 +98,4 @@ if __name__ == "__main__":
     monitor.monitor() 
 
     # Summary
-    df = monitor.summary_pandas()
-    print(df)
-
-    # sum of energy consumption
-    total_energy = df['energy_uj'].sum() / 1_000_000  # Convert from microjoules to joules
-    print(f"Total energy consumption: {total_energy:.2f} J")
+    monitor.summary_csv()

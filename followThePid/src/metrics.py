@@ -95,10 +95,10 @@ class MetricsHandler():
         if not self.samples:
             return False
         
-        with open(self.filename, 'w', newline='') as csvfile:
+        with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["id", "pid", "cpu_PIDs", "cpu_system", "energy_uj"])
+            writer.writerow(["pid", "cpu_PIDs", "cpu_system", "energy_uj"])
             for sample in self.samples:
-                writer.writerow([sample.id, sample.pid, sample.cpu_PIDs, sample.cpu_system, sample.energy])
+                writer.writerow([sample.pid, sample.cpu_PIDs, sample.cpu_system, sample.energy])
 
         return True
