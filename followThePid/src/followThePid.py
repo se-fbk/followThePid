@@ -4,13 +4,16 @@ from cpu import CPUManager
 from metrics import MetricSample, MetricsHandler
 
 class ProcessEnergyMonitorError(Exception):
-    pass
+    def __init__(self, message="An error occurred in the energy monitor."):
+        super().__init__(message)
 
 class ProcessNotFoundError(ProcessEnergyMonitorError):
-    pass
+    def __init__(self, pid=None, message=None):
+        msg = message or f"Process with PID {pid} not found." if pid else "Process not found."
+        super().__init__(msg)
 
 class FollowThePid:
-    def __init__(self, cmd: str, sampling_interval: float = 0.2):
+    def __init__(self, cmd: str, sampling_interval: float = 0.1):
         """
         Initializes the energy monitor for a specific process.
 
@@ -38,7 +41,7 @@ class FollowThePid:
         energy = self.device.get_energy()  # uJ
         
         logging.info(
-            f"CPU: {cpu_PIDs:.2f}% | CPU Sys: {cpy_system:.2f}%] | "
+            f"CPU: {cpu_PIDs:.2f}% | CPU Sys: {cpy_system:.2f}% | "
             f"Rapl: {energy:.2f} uJ | " 
             f"PIDs: {[p.pid for p in self.cpu.get_process_tree()]}"
         ) 
@@ -61,8 +64,9 @@ class FollowThePid:
         
         args = shlex.split(self.cmd)
         self.process = subprocess.Popen(args, shell=False)
-
         self.cpu.set_pid(self.process.pid)
+
+        self.device.setup()  # Start the device monitoring
 
         # Start monitoring
         try:
@@ -75,6 +79,9 @@ class FollowThePid:
         except ProcessNotFoundError:
             pass
         
+        finally:
+            self.device.close()  # Clean up device resources
+        
     def summary_csv(self):
         return self.metrics.summary_csv()
 
@@ -84,7 +91,7 @@ class FollowThePid:
 if __name__ == "__main__":
 
     monitor = FollowThePid(
-        cmd="java -jar /home/pietrofbk/git/iv4xr-mbt/target/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
+        cmd="java -javaagent:/Users/pietrolechthaler/git/joularjx-3.0.1.jar -jar /Users/pietrolechthaler/git/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
     )
     
     # Start monitoring the process

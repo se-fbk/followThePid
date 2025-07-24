@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 class DeviceBase(ABC):
-    def __init__(self, sampling_interval: float = 0.1):
+    def __init__(self, sampling_interval: float):
         self.sampling_interval = sampling_interval
 
     @abstractmethod
@@ -10,5 +10,9 @@ class DeviceBase(ABC):
     
     @abstractmethod
     def get_energy(self):
+        pass
+
+    @abstractmethod
+    def close(self):
         pass
 

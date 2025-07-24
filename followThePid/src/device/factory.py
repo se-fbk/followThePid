@@ -1,6 +1,6 @@
 import sys
 from .linux import DeviceLinux
-# from .mac import DeviceMac
+from .mac import DeviceMacOS
 # from .windows import DeviceWindows
 
 class Device:
@@ -16,8 +16,7 @@ class Device:
             raise NotImplementedError("Windows is not yet supported.")
         
         elif current_platform.startswith('darwin'):
-            # return DeviceMac(sampling_interval)
-            raise NotImplementedError("macOS is not yet supported.")
+            return DeviceMacOS(sampling_interval)
         
         else:
             raise RuntimeError(f"Unsupported platform: {current_platform}. Supported platforms are Linux, Windows, and macOS.")

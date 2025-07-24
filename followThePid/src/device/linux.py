@@ -9,7 +9,7 @@ class DeviceLinux(DeviceBase):
         "/sys/class/powercap/intel-rapl:0:0/"
     ]
 
-    def __init__(self, sampling_interval: float = 0.1):
+    def __init__(self, sampling_interval):
         
         super().__init__(sampling_interval)
         self.domain = self.setup()
@@ -76,3 +76,6 @@ class DeviceLinux(DeviceBase):
                 return energy_used  #uJ
             except Exception as e:
                 raise RuntimeError(f"Error calculating energy consumption : {e}")
+            
+    def close(self):
+        pass
