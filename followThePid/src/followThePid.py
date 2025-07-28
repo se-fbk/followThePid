@@ -2,6 +2,7 @@ import psutil, subprocess, shlex, logging
 from device.factory import Device
 from cpu import CPUManager
 from metrics import MetricSample, MetricsHandler
+import os
 
 class ProcessEnergyMonitorError(Exception):
     def __init__(self, message="An error occurred in the energy monitor."):
@@ -59,6 +60,8 @@ class FollowThePid:
         """
         Starts monitoring the process specified by the command.
         """
+        logging.info("Starting process monitoring.")
+
         if not self.cmd:
             raise ProcessEnergyMonitorError("No command provided to monitor.")
         
@@ -81,17 +84,30 @@ class FollowThePid:
         
         finally:
             self.device.close()  # Clean up device resources
+
+        logging.info("Process monitoring completed.")
         
-    def summary_csv(self):
-        return self.metrics.summary_csv()
+        
+    def summary_csv(self, filename: str = "followThePid_report.csv"):
+        logging.info("Generating CSV Report at %s", filename)
+
+        if not self.metrics.summary_csv(filename):
+            logging.error("Failed to generate CSV report.")
+            return False
+
+        return True
 
     def summary_pandas(self):
+        logging.info("Generating Pandas DataFrame Report")
         return self.metrics.summary_pandas()
 
 if __name__ == "__main__":
 
+    # Example usage
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
     monitor = FollowThePid(
-        cmd="java -javaagent:/Users/pietrolechthaler/git/joularjx-3.0.1.jar -jar /Users/pietrolechthaler/git/EvoMBT-1.2.2-jar-with-dependencies.jar -random -Dsut_efsm=examples.traffic_light -Drandom_seed=123456",
+        cmd=f"python3 {base_dir}/example/simple_example.py"
     )
     
     # Start monitoring the process

@@ -88,7 +88,7 @@ class MetricsHandler():
         df = pd.DataFrame(data)
         return df
     
-    def summary_csv(self, filename: str = "followThePid_report.csv"):
+    def summary_csv(self, filename):
         """
         Writes the energy consumption summary to a CSV file.
         """
@@ -100,5 +100,4 @@ class MetricsHandler():
             writer.writerow(["pid", "cpu_PIDs", "cpu_system", "energy_uj"])
             for sample in self.samples:
                 writer.writerow([sample.pid, sample.cpu_PIDs, sample.cpu_system, sample.energy])
-
         return True
