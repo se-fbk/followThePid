@@ -56,7 +56,7 @@ class FollowThePid:
 
         return sample
 
-    def monitor(self):
+    def monitor(self, timeout: int = 10000):
         """
         Starts monitoring the process specified by the command.
         """
@@ -66,7 +66,7 @@ class FollowThePid:
             raise ProcessEnergyMonitorError("No command provided to monitor.")
         
         args = shlex.split(self.cmd)
-        self.process = subprocess.Popen(args, shell=False)
+        self.process = subprocess.Popen(args, shell=False, timeout=timeout)
         self.cpu.set_pid(self.process.pid)
 
         self.device.setup()  # Start the device monitoring
