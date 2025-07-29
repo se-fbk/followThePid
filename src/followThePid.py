@@ -3,6 +3,7 @@ from device.factory import Device
 from cpu import CPUManager
 from metrics import MetricSample, MetricsHandler
 import os
+import time
 
 class ProcessEnergyMonitorError(Exception):
     def __init__(self, message="An error occurred in the energy monitor."):
@@ -69,11 +70,17 @@ class FollowThePid:
         self.process = subprocess.Popen(args, shell=False, timeout=timeout)
         self.cpu.set_pid(self.process.pid)
 
+        start_time = time.time()
         self.device.setup()  # Start the device monitoring
 
         # Start monitoring
         try:
             while self.process.poll() is None:
+                if timeout and (time.time() - start_time) > timeout:
+                    logging.warning("Timeout reached. Killing the process.")
+                    self.process.kill()
+                    break
+                
                 sample = self._take_measurement()
                 
                 if sample is not None:
@@ -85,7 +92,7 @@ class FollowThePid:
         finally:
             self.device.close()  # Clean up device resources
 
-        logging.info("Process monitoring completed.")
+        logging.info("Process monitoring terminated.")
         
         
     def summary_csv(self, filename: str = "followThePid_report.csv"):

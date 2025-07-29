@@ -9,6 +9,7 @@ setup(
     version="0.1.0",               
     packages=find_packages(),       
     install_requires=read_requirements(),
+    package_dir={"": "src"},
     author="Pietro Lechthaler",
     author_email="pietrolechthaler@gmail.com",
     description="",
