@@ -34,44 +34,22 @@ class MetricsHandler():
         """
         self.samples.append(sample)
 
-    def _get_system_energy(self) -> float:
-        """
-        Calculates the total energy consumed by the system (Joule) based on the first and last samples.
-        """
-        first_energy = self.samples[0].energy if self.samples else 0.0
-        last_energy = self.samples[-1].energy if self.samples else 0.0
-
-        return (last_energy - first_energy) / 1_000_000  # Convert from microjoules to joules
-
-    def _get_pid_energy(self) -> float:
+    def get_pid_energy(self) -> float:
         """
         Calculates the total energy consumed by the process (Joule) based on the samples.
         """
-        # At least two samples are needed to calculate energy consumption
-        if len(self.samples) < 2: 
-            return 0.0
-
         total_energy = 0.0
 
-        for prev, curr in zip(self.samples, self.samples[1:]):
-            energy_delta = curr.energy - prev.energy  # uJ
-            cpu_usage = curr.cpu_PIDs  # [0,1]
-            cpu_system = curr.cpu_system # [0,1]
+        for sample in self.samples:
+            energy = sample.energy  # uJ
+            cpu_usage = sample.cpu_PIDs  # [0,1]
+            cpu_system = sample.cpu_system # [0,1]
 
-            total_energy += (energy_delta * cpu_usage) / cpu_system
+            total_energy += energy * (cpu_usage / cpu_system)
 
         return total_energy / 1_000_000  # Convert from microjoules to joules
-
-
-    def _get_last_sample(self):
-        """
-        Returns the last sample taken.
-        """
-        if self.samples:
-            return self.samples[-1]
-        return None
-
-    def summary_pandas(self):
+    
+    def samples_pandas(self):
         """
         Converts the energy samples into a Pandas DataFrame
         """
@@ -88,7 +66,7 @@ class MetricsHandler():
         df = pd.DataFrame(data)
         return df
     
-    def summary_csv(self, filename):
+    def samples_csv(self, filename):
         """
         Writes the energy consumption summary to a CSV file.
         """

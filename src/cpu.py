@@ -60,20 +60,16 @@ class CPUManager():
         Measures the CPU usage of the monitored process.
         :return: CPU usage as a percentage normalized by the number of cores.
         """
-        
-        self._warmup_cpu()
-        time.sleep(self.sampling_interval)
+        if not self.process_tree:
+            self._warmup_cpu()
 
         cpu_total = 0.0
-
-        for p in self.process_tree: 
+        for p in list(self.process_tree):
             try:
-                cpu_p = p.cpu_percent(interval=None) / self.num_cores  # normalize by number of cores
+                cpu_p = p.cpu_percent(interval=None) / self.num_cores
                 cpu_total += cpu_p
-
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
-        
         return cpu_total / 100.0
 
     def get_cpu_system(self) -> float:

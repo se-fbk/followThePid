@@ -43,7 +43,7 @@ class FollowThePid:
         energy = self.device.get_energy()  # uJ
         
         logging.info(
-            f"CPU: {cpu_PIDs:.2f}% | CPU Sys: {cpy_system:.2f}% | "
+            f"CPU: {cpu_PIDs:.2f} | CPU Sys: {cpy_system:.2f} | "
             f"Rapl: {energy:.2f} uJ | " 
             f"PIDs: {[p.pid for p in self.cpu.get_process_tree()]}"
         ) 
@@ -75,7 +75,7 @@ class FollowThePid:
         self.cpu.set_pid(self.process.pid)
 
         start_time = time.time()
-        self.device.setup()  # Start the device monitoring
+        self.device.setup()  # Setup the device monitoring
 
         # Start monitoring
         try:
@@ -99,18 +99,26 @@ class FollowThePid:
         logging.info("Process monitoring terminated.")
         
         
-    def summary_csv(self, filename: str = "followThePid_report.csv"):
-        logging.info("Generating CSV Report at %s", filename)
+    def samples_csv(self, filename: str = "followThePid_samples.csv"):
+        logging.info("Generating CSV of samples at %s", filename)
 
-        if not self.metrics.summary_csv(filename):
+        if not self.metrics.samples_csv(filename):
             logging.error("Failed to generate CSV report.")
             return False
 
         return True
 
-    def summary_pandas(self):
-        logging.info("Generating Pandas DataFrame Report")
-        return self.metrics.summary_pandas()
+    def samples_pandas(self):
+        logging.info("Generating Pandas DataFrame for samples")
+        return self.metrics.samples_pandas()
+    
+    def get_pid_energy(self) -> float:
+        """
+        Returns the total energy consumed by the process in Joules.
+        """
+        energy = self.metrics.get_pid_energy()
+        logging.info(f"Total energy consumed by PID {self.cpu.get_pid()}: {energy:.2f} J")
+        return energy
 
 if __name__ == "__main__":
 
@@ -124,5 +132,7 @@ if __name__ == "__main__":
     # Start monitoring the process
     monitor.monitor() 
 
-    # Summary
-    monitor.summary_csv()
+    # Save the samples to a CSV file
+    monitor.samples_csv()
+
+    total_energy = monitor.get_pid_energy()

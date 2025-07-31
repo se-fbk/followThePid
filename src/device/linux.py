@@ -10,10 +10,11 @@ class DeviceLinux(DeviceBase):
     ]
 
     def __init__(self, sampling_interval):
-        
         super().__init__(sampling_interval)
         self.domain = self.setup()
-        self.sampling_interval = sampling_interval
+
+        self.last_energy = self._read_domain()
+        self.max_energy = self._get_max_energy()
 
     def _is_readable(self, path: str) -> bool:
         """
@@ -27,6 +28,7 @@ class DeviceLinux(DeviceBase):
         """
         for path in self.SOURCES:
             if self._is_readable(path):
+                print(f"Using RAPL source: {path}")
                 return path
         raise RuntimeError("No readable RAPL source found.")
 
@@ -61,21 +63,21 @@ class DeviceLinux(DeviceBase):
             raise RuntimeError(f"Error reading device name: {e}")
 
     def get_energy(self):
-            try:
-                energy_start = self._read_domain()
-                time.sleep(self.sampling_interval)
-                energy_end = self._read_domain()
+        try:
+            current_energy = self._read_domain()
 
-                if energy_end < energy_start:
-                    # Overflow detected, calculate the energy used
-                    max_energy = self._get_max_energy()
-                    energy_used = (max_energy - energy_start) + energy_end
-                else:
-                    energy_used = energy_end - energy_start
+            # Overflow handling
+            if current_energy < self.last_energy:
+                energy_used = (self.max_energy - self.last_energy) + current_energy
 
-                return energy_used  #uJ
-            except Exception as e:
-                raise RuntimeError(f"Error calculating energy consumption : {e}")
+            else:
+                energy_used = current_energy - self.last_energy
+
+            self.last_energy = current_energy
+            return energy_used
+        
+        except Exception as e:
+            raise RuntimeError(f"Error calculating energy consumption: {e}")
             
     def close(self):
         pass
