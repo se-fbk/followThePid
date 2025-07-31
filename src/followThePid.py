@@ -67,7 +67,11 @@ class FollowThePid:
             raise ProcessEnergyMonitorError("No command provided to monitor.")
         
         args = shlex.split(self.cmd)
-        self.process = subprocess.Popen(args, shell=False, timeout=timeout)
+
+        if timeout is not None and timeout <= 0:
+            raise ValueError("Timeout must be a positive integer or None.")
+                    
+        self.process = subprocess.Popen(args, shell=False)
         self.cpu.set_pid(self.process.pid)
 
         start_time = time.time()
