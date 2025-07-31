@@ -1,5 +1,4 @@
 import os
-import time
 from .base import DeviceBase
 
 class DeviceLinux(DeviceBase):

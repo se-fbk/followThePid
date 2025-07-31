@@ -1,5 +1,4 @@
 import psutil
-import time
 
 class CPUManager():
     """

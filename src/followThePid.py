@@ -1,9 +1,8 @@
-import psutil, subprocess, shlex, logging
+import psutil, subprocess, shlex, logging, os, time
 from device.factory import Device
 from cpu import CPUManager
 from metrics import MetricSample, MetricsHandler
-import os
-import time
+
 
 class ProcessEnergyMonitorError(Exception):
     def __init__(self, message="An error occurred in the energy monitor."):
@@ -44,7 +43,7 @@ class FollowThePid:
         
         logging.info(
             f"CPU: {cpu_PIDs:.2f} | CPU Sys: {cpy_system:.2f} | "
-            f"Rapl: {energy:.2f} uJ | " 
+            f"Rapl: {energy:8f} uJ | " 
             f"PIDs: {[p.pid for p in self.cpu.get_process_tree()]}"
         ) 
 
