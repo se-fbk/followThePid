@@ -41,11 +41,11 @@ class FollowThePid:
         
         energy = self.device.get_energy()  # uJ
         
-        logging.info(
-            f"CPU: {cpu_PIDs:.2f} | CPU Sys: {cpy_system:.2f} | "
-            f"Rapl: {energy:8f} uJ | " 
-            f"PIDs: {[p.pid for p in self.cpu.get_process_tree()]}"
-        ) 
+        # logging.info(
+        #     f"CPU: {cpu_PIDs:.2f} | CPU Sys: {cpy_system:.2f} | "
+        #     f"Rapl: {energy:8f} uJ | " 
+        #     f"PIDs: {[p.pid for p in self.cpu.get_process_tree()]}"
+        # ) 
 
         sample = MetricSample(
             pid = self.cpu.get_pid(),
@@ -60,7 +60,7 @@ class FollowThePid:
         """
         Starts monitoring the process specified by the command.
         """
-        logging.info("Starting process monitoring.")
+        logging.info("Starting process monitoring")
 
         if not self.cmd:
             raise ProcessEnergyMonitorError("No command provided to monitor.")
@@ -74,7 +74,6 @@ class FollowThePid:
         self.cpu.set_pid(self.process.pid)
 
         start_time = time.time()
-        self.device.setup()  # Setup the device monitoring
 
         # Start monitoring
         try:
@@ -95,14 +94,14 @@ class FollowThePid:
         finally:
             self.device.close()  # Clean up device resources
 
-        logging.info("Process monitoring terminated.")
+        logging.info("Process monitoring terminated")
         
         
     def samples_csv(self, filename: str = "followThePid_samples.csv"):
         logging.info("Generating CSV of samples at %s", filename)
 
         if not self.metrics.samples_csv(filename):
-            logging.error("Failed to generate CSV report.")
+            logging.error("Failed to generate CSV report")
             return False
 
         return True
