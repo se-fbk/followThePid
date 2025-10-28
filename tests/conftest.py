@@ -3,7 +3,7 @@ import types
 
 @pytest.fixture
 def dummy_device(monkeypatch):
-    """Mock del Device"""
+    """Device mock"""
     dummy = types.SimpleNamespace()
     dummy.get_energy = lambda: 123.456
     dummy.close = lambda: None
@@ -12,7 +12,7 @@ def dummy_device(monkeypatch):
 
 @pytest.fixture
 def dummy_cpu(monkeypatch):
-    """Mock del CPUManager"""
+    """CPUManager mock"""
     cpu = types.SimpleNamespace()
     cpu.get_cpu_usage = lambda: 0.5
     cpu.get_cpu_system = lambda: 0.25
@@ -24,7 +24,7 @@ def dummy_cpu(monkeypatch):
 
 @pytest.fixture
 def dummy_metrics(monkeypatch):
-    """Mock del MetricsHandler"""
+    """MetricsHandler mock"""
     m = types.SimpleNamespace()
     m.add_sample = lambda s: True
     m.samples_csv = lambda f="": True
