@@ -57,5 +57,5 @@ monitor = FollowThePid(
 monitor.monitor() 
 
 # Summary
-monitor.summary_csv()
+monitor.samples_csv()
 ```
