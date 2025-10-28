@@ -1,7 +1,7 @@
 import psutil, subprocess, shlex, logging, os, time
-from device.factory import Device
-from cpu import CPUManager
-from metrics import MetricSample, MetricsHandler
+from .device.factory import Device
+from .cpu import CPUManager
+from .metrics import MetricSample, MetricsHandler
 
 
 class ProcessEnergyMonitorError(Exception):
