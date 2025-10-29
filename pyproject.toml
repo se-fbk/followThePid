@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "followthepid"  # minuscolo consigliato su PyPI
+version = "0.1.0"
+description = "followThePid is a Python library for tracing the CPU usage and energy consumption of a running process using its PID."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+  { name = "Pietro Lechthaler", email = "plechthaler@gmail.com" }
+]
+keywords = ["pid", "energy", "energy-consumption", "cpu-usage", "monitoring", "tracing", "performance"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering"
+]
+
+dependencies = [
+  "numpy==2.3.4",
+  "pandas==2.3.3",
+  "psutil==7.1.2"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.4.2",
+  "pytest-cov>=7.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/se-fbk/followThePid"
+Issues = "https://github.com/se-fbk/followThePid/issues"
+Repository = "https://github.com/se-fbk/followThePid"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
