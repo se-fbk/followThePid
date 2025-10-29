@@ -24,12 +24,22 @@ It supports **Linux** and **macOS** (Intel and Apple Silicon).
 
 
 ## Installation
+### Recommended: Install from PyPI
+The easiest way to install followThePid is directly from the PyPI:
+```
+pip install followthepid
+```
+### Alternative: install from source
+If you prefer to clone and work on the source code:
+
 ```bash
-git clone https://github.com/your-username/followThePid.git
+git clone https://github.com/se-fbk/followThePid.git
 cd followThePid
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -e ".[test]"
 ```
 
 ## RAPL Permissions
