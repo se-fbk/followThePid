@@ -33,20 +33,21 @@ class FollowThePid:
         self.metrics = MetricsHandler()
         
     def _take_measurement(self):
-        cpu_PIDs = self.cpu.get_cpu_usage() # % [0,1]
-        cpy_system = self.cpu.get_cpu_system() # % [0,1]
+
+        try:
+            cpu_PIDs = self.cpu.get_cpu_usage() # % [0,1]
+            cpy_system = self.cpu.get_cpu_system()  # % [0,1]
+            energy = self.device.get_energy()
+        except Exception as e:
+            logging.warning(f"Measurement failed: {e}")
+            return None
 
         if cpu_PIDs is None or cpy_system is None:
+            logging.debug("Skipping sample, incomplete CPU metrics")
             return None
         
         energy = self.device.get_energy()  # uJ
         
-        # logging.info(
-        #     f"CPU: {cpu_PIDs:.2f} | CPU Sys: {cpy_system:.2f} | "
-        #     f"Rapl: {energy:8f} uJ | " 
-        #     f"PIDs: {[p.pid for p in self.cpu.get_process_tree()]}"
-        # ) 
-
         sample = MetricSample(
             pid = self.cpu.get_pid(),
             cpu_PIDs = cpu_PIDs,
