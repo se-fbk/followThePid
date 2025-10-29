@@ -59,3 +59,8 @@ monitor.monitor()
 # Summary
 monitor.samples_csv()
 ```
+
+## Learn More
+
+For detailed information on how **followThePid** works, supported architectures, and configuration examples,  
+see the [📘 Wiki](https://github.com/se-fbk/followThePid/wiki/FollowThePid).
