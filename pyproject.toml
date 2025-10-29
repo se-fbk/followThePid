@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "followthepid"  # minuscolo consigliato su PyPI
-version = "0.1.0"
+version = "0.1.2"
 description = "followThePid is a Python library for tracing the CPU usage and energy consumption of a running process using its PID."
 readme = "README.md"
 requires-python = ">=3.12"
